@@ -1,0 +1,39 @@
+create database artistDb;
+USE artistDb;
+CREATE TABLE Users (  
+    id INT PRIMARY KEY IDENTITY(1,1),
+    first_name VARCHAR(255) NOT NULL,
+    last_name VARCHAR(255) NOT NULL,
+    email VARCHAR(255) NULL UNIQUE,  
+    password VARCHAR(500) NOT NULL,
+    phone VARCHAR(20) NOT NULL UNIQUE, 
+    gender CHAR(1) NOT NULL CHECK (gender IN ('m', 'f', 'o')),
+    dob DATE NULL, 
+    address VARCHAR(255) NULL,
+    created_at DATETIME2 DEFAULT GETDATE() NOT NULL, 
+    updated_at DATETIME2 DEFAULT GETDATE() NOT NULL  
+);
+
+CREATE TABLE Artist(
+		id INT PRIMARY KEY IDENTITY(1,1),
+		dob DATE NULL, 
+		gender CHAR(1) NOT NULL CHECK (gender IN ('m', 'f', 'o')),
+		address VARCHAR(255) NULL,
+		first_release_year INT CHECK (first_release_year BETWEEN 1900 AND 2100),                                   --MS SQL doesn't have year type
+		no_of_albums_released INT,
+		created_at DATETIME2 DEFAULT GETDATE() NOT NULL, 
+		updated_at DATETIME2 DEFAULT GETDATE() NOT NULL  
+);
+
+
+CREATE TABLE Music (
+    id INT PRIMARY KEY IDENTITY(1,1),
+    artist_id INT NOT NULL, 
+    title VARCHAR(255) NOT NULL,
+    album_name VARCHAR(255) NOT NULL, 
+    genre VARCHAR(20) NOT NULL CHECK (genre IN ('rnb', 'country', 'classic', 'rock', 'jazz')),
+    created_at DATETIME2 DEFAULT GETDATE() NOT NULL, 
+    updated_at DATETIME2 DEFAULT GETDATE() NOT NULL, 
+    
+    CONSTRAINT FK_artist_id FOREIGN KEY (artist_id) REFERENCES Artist(id) ON DELETE CASCADE
+);

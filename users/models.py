@@ -1,3 +1,9 @@
-from django.db import models
 
 
+class Users():
+    fname=''
+
+    def __init__(self,fname):
+        self.fname=fname
+
+        
