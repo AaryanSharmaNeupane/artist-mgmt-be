@@ -25,6 +25,8 @@ CREATE TABLE Artist(
 		updated_at DATETIME2 DEFAULT GETDATE() NOT NULL  
 );
 
+ALTER TABLE [artistDb].[dbo].[Artist] add name VARCHAR(255) NOT NULL
+
 
 CREATE TABLE Music (
     id INT PRIMARY KEY IDENTITY(1,1),

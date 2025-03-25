@@ -167,7 +167,7 @@ def delete_users(request, *args, **kwargs):
             with connection.cursor() as cursor:
                 cursor.execute(
                     '''
-                    SELECT 1 FROM Users WHERE id = %s
+                    SELECT * FROM Users WHERE id = %s
                     ''', 
                     [user_id]
                 )
@@ -223,7 +223,7 @@ def update_users(request, *args, **kwargs):
             with connection.cursor() as cursor:
                 cursor.execute(
                     '''
-                    SELECT 1 FROM Users WHERE id = %s
+                    SELECT * FROM Users WHERE id = %s
                     ''', 
                     [user_id]
                 )
