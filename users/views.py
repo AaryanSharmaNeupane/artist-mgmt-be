@@ -135,3 +135,104 @@ def get_users(request, *args, **kwargs):
 
     except Exception as e:
         return JsonResponse(ServiceResult.as_failure(str(e),status=500).to_dict())
+
+
+@csrf_exempt
+def delete_users(request, *args, **kwargs):
+    if request.method != "DELETE":
+        return JsonResponse(ServiceResult.as_failure("Only DELETE method allowed", status=405).to_dict(), status=405)
+
+    try:
+        user_id = kwargs.get("id") 
+        # or request.GET.get("id")
+        if not user_id:
+            return JsonResponse(ServiceResult.as_failure("User ID is required", status=400).to_dict())
+
+        with transaction.atomic():
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    '''
+                    SELECT * FROM Users WHERE id = %s
+                    ''', 
+                    [user_id]
+                )
+                user = cursor.fetchone()
+                if not user:
+                    return JsonResponse(ServiceResult.as_failure("User ID not found", status=404).to_dict())
+                cursor.execute(
+                    '''
+                    DELETE FROM Users WHERE id = %s
+                    ''', 
+                    [user_id]
+                )
+
+                return JsonResponse(ServiceResult.as_success("User Deleted Successfully").to_dict())
+
+    except IntegrityError as e:
+        return JsonResponse(ServiceResult.as_failure("Database error: " + str(e), status=400).to_dict())
+
+    except Exception as e:
+        return JsonResponse(ServiceResult.as_failure(str(e), status=500).to_dict(), status=500)
+
+
+@csrf_exempt
+def update_users(request, *args, **kwargs):
+    if request.method != "PUT":
+        return JsonResponse(ServiceResult.as_failure("Only PUT method allowed", status=405).to_dict())
+
+    try:
+        data = json.loads(request.body.decode("utf-8"))
+        user_id = data.get("id")
+
+        if not user_id:
+            return JsonResponse(ServiceResult.as_failure("User ID is required", status=400).to_dict())
+
+        fname = data.get("fname")
+        lname = data.get("lname")
+        email = data.get("email")  
+        phone = data.get("phone")
+        gender = data.get("gender")
+        dob = data.get("dob")
+        address = data.get("address")
+
+        required_fields = ["fname", "lname", "phone", "gender"]
+        missing_fields = [field for field in required_fields if not data.get(field)]
+        if missing_fields:
+            return JsonResponse(ServiceResult.as_failure("Required fields missing", status=400).to_dict())
+        
+        gender_map = {"Male": "m", "Female": "f", "Others": "o"}
+        gender = gender_map.get(gender.lower(), "o")
+
+        with transaction.atomic():
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    '''
+                    SELECT * FROM Users WHERE id = %s
+                    ''', 
+                    [user_id]
+                )
+                user = cursor.fetchone()
+
+                if not user:
+                    return JsonResponse(ServiceResult.as_failure("User ID not found", status=404).to_dict())
+                
+                cursor.execute(
+                    '''
+                    UPDATE Users 
+                    SET first_name = %s, last_name = %s, email = %s, phone = %s, gender = %s, dob = %s, address = %s,updated_at=CURRENT_TIMESTAMP
+                    WHERE id = %s
+                    ''',
+                    [fname, lname, email, phone, gender, dob, address, user_id]
+                )
+
+        return JsonResponse(ServiceResult.as_success("User Updated Successfully").to_dict())
+
+    except IntegrityError as e:
+        error_message = str(e)
+        if "Violation of UNIQUE KEY constraint" in error_message or "duplicate key" in error_message:
+            return JsonResponse(ServiceResult.as_failure("Duplicate entry detected", status=400).to_dict())
+        else:
+            return JsonResponse(ServiceResult.as_failure("Database error: " + error_message, status=400).to_dict(),)
+
+    except Exception as e:
+        return JsonResponse(ServiceResult.as_failure(str(e), status=500).to_dict())
