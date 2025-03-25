@@ -22,47 +22,61 @@ def add_users(request, *args, **kwargs):
         data = json.loads(request.body.decode("utf-8"))
         fname = data.get("fname")
         lname = data.get("lname")
-        email = data.get("email")  
+        email = data.get("email")
         phone = data.get("phone")
         gender = data.get("gender")
         dob = data.get("dob")
         address = data.get("address")
-
+        
         required_fields = ["fname", "lname", "phone", "gender"]
         missing_fields = [field for field in required_fields if not data.get(field)]
         if missing_fields:
-            return JsonResponse(ServiceResult.as_failure(error_message="Required fields missing",status=400).to_dict())
+            return JsonResponse(ServiceResult.as_failure(error_message="Required fields missing", status=400).to_dict())
 
         password = f"{fname}{phone[-4:]}"
         hashed_password = hash_password(password)
 
-        gender_map = {"Male": "m", "Female": "f", "Others": "o"}
-        gender = gender_map.get(gender.lower(), "o") 
+        gender_map = {"male": "m", "female": "f", "others": "o"}
+        gender = gender_map.get(gender.lower())
 
         with transaction.atomic():
             with connection.cursor() as cursor:
                 cursor.execute(
                     '''
                     INSERT INTO Users (first_name, last_name, email, password, phone, gender, dob, address)
+                    OUTPUT INSERTED.id
                     VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
                     ''',
                     [fname, lname, email, hashed_password, phone, gender, dob, address]
                 )
-                 
-            result = ServiceResult.as_success("User Added Successfully")           
-            return JsonResponse(result.to_dict(), status=200)
+                user_id = cursor.fetchone()[0] 
+
+        user_data = {
+            "id": user_id,
+            "fname": fname,
+            "lname": lname,
+            "email": email,
+            "phone": phone,
+            "gender": gender,
+            "dob": dob,
+            "address": address
+        }
+        
+        result = ServiceResult.as_success(user_data)
+        return JsonResponse(result.to_dict(), status=200)
 
     except IntegrityError as e:
         error_message = str(e)
         if "Violation of UNIQUE KEY constraint" in error_message or "duplicate key" in error_message:
-            result = ServiceResult.as_failure("Duplicate entry detected",status=400)
+            result = ServiceResult.as_failure("Duplicate entry detected", status=400)
         else:
-            result = ServiceResult.as_failure("Database error: " + error_message,status=400)
+            result = ServiceResult.as_failure("Database error: " + error_message, status=400)
         return JsonResponse(result.to_dict())
 
     except Exception as e:
         result = ServiceResult.as_failure(str(e), status=500)
         return JsonResponse(result.to_dict())
+
     
 
 @csrf_exempt
@@ -72,7 +86,7 @@ def get_users(request, *args, **kwargs):
         return JsonResponse(result.to_dict())
 
     try:
-        gender_map = {"m": "Male", "f": "Female", "o": "Others"}
+        gender_map = {"m": "male", "f": "female", "o": "others"}
 
         with transaction.atomic():
             with connection.cursor() as cursor:
@@ -80,7 +94,7 @@ def get_users(request, *args, **kwargs):
                     user_id = kwargs.get("id")
                     cursor.execute(
                         '''
-                        SELECT first_name, last_name, email, phone, gender, dob, address
+                        SELECT first_name, last_name, email, phone, gender, dob, address,id
                         FROM Users WHERE id = %s
                         ''', 
                         [user_id]
@@ -91,21 +105,22 @@ def get_users(request, *args, **kwargs):
                         return JsonResponse(ServiceResult.as_failure("User ID not found", status=404).to_dict())
 
                     user_data = {
-                        "first_name": user[0],
-                        "last_name": user[1],
+                        "fname": user[0],
+                        "lname": user[1],
                         "email": user[2],
                         "phone": user[3],
-                        "gender": gender_map.get(user[4], "Others"),
+                        "gender": gender_map.get(user[4]),
                         "dob": user[5],
-                        "address": user[6]
+                        "address": user[6],
+                        "id":user[7]
                     }
 
                     return JsonResponse(ServiceResult.as_success(user_data).to_dict())
 
                 cursor.execute(
                     '''
-                    SELECT first_name, last_name, email, phone, gender, dob, address
-                    FROM Users
+                    SELECT first_name, last_name, email, phone, gender, dob, address,id
+                    FROM Users ORDER BY ID DESC
                     '''
                 )
                 users = cursor.fetchall()
@@ -115,13 +130,14 @@ def get_users(request, *args, **kwargs):
 
                 users_data = [
                     {
-                        "first_name": user[0],
-                        "last_name": user[1],
+                        "fname": user[0],
+                        "lname": user[1],
                         "email": user[2],
                         "phone": user[3],
-                        "gender": gender_map.get(user[4], "Others"),
+                        "gender": gender_map.get(user[4]),
                         "dob": user[5],
-                        "address": user[6]
+                        "address": user[6],
+                        "id":user[7]
                     }
                     for user in users
                 ]
@@ -144,7 +160,6 @@ def delete_users(request, *args, **kwargs):
 
     try:
         user_id = kwargs.get("id") 
-        # or request.GET.get("id")
         if not user_id:
             return JsonResponse(ServiceResult.as_failure("User ID is required", status=400).to_dict())
 
@@ -182,6 +197,7 @@ def update_users(request, *args, **kwargs):
 
     try:
         data = json.loads(request.body.decode("utf-8"))
+        print(data)
         user_id = data.get("id")
 
         if not user_id:
@@ -191,7 +207,7 @@ def update_users(request, *args, **kwargs):
         lname = data.get("lname")
         email = data.get("email")  
         phone = data.get("phone")
-        gender = data.get("gender")
+        original_gender=gender = data.get("gender")
         dob = data.get("dob")
         address = data.get("address")
 
@@ -200,8 +216,8 @@ def update_users(request, *args, **kwargs):
         if missing_fields:
             return JsonResponse(ServiceResult.as_failure("Required fields missing", status=400).to_dict())
         
-        gender_map = {"Male": "m", "Female": "f", "Others": "o"}
-        gender = gender_map.get(gender.lower(), "o")
+        gender_map = {"male": "m", "female": "f", "others": "o"}
+        gender = gender_map.get(gender.lower())
 
         with transaction.atomic():
             with connection.cursor() as cursor:
@@ -225,7 +241,18 @@ def update_users(request, *args, **kwargs):
                     [fname, lname, email, phone, gender, dob, address, user_id]
                 )
 
-        return JsonResponse(ServiceResult.as_success("User Updated Successfully").to_dict())
+                user_data = {
+                    "id": user_id,
+                    "fname": fname,
+                    "lname": lname,
+                    "email": email,
+                    "phone": phone,
+                    "gender": original_gender,
+                    "dob": dob,
+                    "address": address
+                }
+
+        return JsonResponse(ServiceResult.as_success(user_data).to_dict())
 
     except IntegrityError as e:
         error_message = str(e)
