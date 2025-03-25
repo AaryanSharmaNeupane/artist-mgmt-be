@@ -63,3 +63,75 @@ def add_users(request, *args, **kwargs):
     except Exception as e:
         result = ServiceResult.as_failure(str(e), status=500)
         return JsonResponse(result.to_dict())
+    
+
+@csrf_exempt
+def get_users(request, *args, **kwargs):
+    if request.method != "GET":
+        result = ServiceResult.as_failure(error_message="Only GET method allowed", status=405)
+        return JsonResponse(result.to_dict())
+
+    try:
+        gender_map = {"m": "Male", "f": "Female", "o": "Others"}
+
+        with transaction.atomic():
+            with connection.cursor() as cursor:
+                if "id" in kwargs:
+                    user_id = kwargs.get("id")
+                    cursor.execute(
+                        '''
+                        SELECT first_name, last_name, email, phone, gender, dob, address
+                        FROM Users WHERE id = %s
+                        ''', 
+                        [user_id]
+                    )
+                    user = cursor.fetchone()
+
+                    if not user:
+                        return JsonResponse(ServiceResult.as_failure("User ID not found", status=404).to_dict())
+
+                    user_data = {
+                        "first_name": user[0],
+                        "last_name": user[1],
+                        "email": user[2],
+                        "phone": user[3],
+                        "gender": gender_map.get(user[4], "Others"),
+                        "dob": user[5],
+                        "address": user[6]
+                    }
+
+                    return JsonResponse(ServiceResult.as_success(user_data).to_dict())
+
+                cursor.execute(
+                    '''
+                    SELECT first_name, last_name, email, phone, gender, dob, address
+                    FROM Users
+                    '''
+                )
+                users = cursor.fetchall()
+
+                if not users:
+                    return JsonResponse(ServiceResult.as_failure("No users found", status=404).to_dict())
+
+                users_data = [
+                    {
+                        "first_name": user[0],
+                        "last_name": user[1],
+                        "email": user[2],
+                        "phone": user[3],
+                        "gender": gender_map.get(user[4], "Others"),
+                        "dob": user[5],
+                        "address": user[6]
+                    }
+                    for user in users
+                ]
+
+                return JsonResponse(ServiceResult.as_success(users_data).to_dict())
+
+    except IntegrityError as e:
+        error_message = str(e)
+        result = ServiceResult.as_failure("Database error: " + error_message, status=400)
+        return JsonResponse(result.to_dict())
+
+    except Exception as e:
+        return JsonResponse(ServiceResult.as_failure(str(e),status=500).to_dict())

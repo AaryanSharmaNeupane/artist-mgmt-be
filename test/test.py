@@ -7,7 +7,7 @@ response = requests.post(
         "lname": "admin",
         "email": "admin@gmail.com",
         "phone": "1234567890",
-        "gender": "male",
+        "gender": "Male",
         "dob": "2000-01-01",
         "address": "xyz"
     }
