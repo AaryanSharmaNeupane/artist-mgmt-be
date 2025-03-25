@@ -167,19 +167,12 @@ def delete_users(request, *args, **kwargs):
             with connection.cursor() as cursor:
                 cursor.execute(
                     '''
-                    SELECT 1 FROM Users WHERE id = %s
-                    ''', 
-                    [user_id]
-                )
-                user = cursor.fetchone()
-                if not user:
-                    return JsonResponse(ServiceResult.as_failure("User ID not found", status=404).to_dict())
-                cursor.execute(
-                    '''
                     DELETE FROM Users WHERE id = %s
                     ''', 
                     [user_id]
                 )
+                if cursor.rowcount == 0:
+                    return JsonResponse(ServiceResult.as_failure("User not found", status=404).to_dict(), status=404)
 
                 return JsonResponse(ServiceResult.as_success("User Deleted Successfully").to_dict())
 
@@ -220,18 +213,7 @@ def update_users(request, *args, **kwargs):
         gender = gender_map.get(gender.lower())
 
         with transaction.atomic():
-            with connection.cursor() as cursor:
-                cursor.execute(
-                    '''
-                    SELECT 1 FROM Users WHERE id = %s
-                    ''', 
-                    [user_id]
-                )
-                user = cursor.fetchone()
-
-                if not user:
-                    return JsonResponse(ServiceResult.as_failure("User ID not found", status=404).to_dict())
-                
+            with connection.cursor() as cursor:    
                 cursor.execute(
                     '''
                     UPDATE Users 
@@ -240,6 +222,8 @@ def update_users(request, *args, **kwargs):
                     ''',
                     [fname, lname, email, phone, gender, dob, address, user_id]
                 )
+                if cursor.rowcount == 0:
+                    return JsonResponse(ServiceResult.as_failure("User not found", status=404).to_dict(), status=404)
 
                 user_data = {
                     "id": user_id,

@@ -178,11 +178,8 @@ def delete_artist(request, *args, **kwargs):
     except Exception as e:
         return JsonResponse(ServiceResult.as_failure(str(e), status=500).to_dict(), status=500)
 
-
-
-
 @csrf_exempt
-def update_users(request, *args, **kwargs):
+def update_artist(request, *args, **kwargs):
     if request.method != "PUT":
         return JsonResponse(ServiceResult.as_failure("Only PUT method allowed", status=405).to_dict())
 
