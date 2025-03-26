@@ -69,12 +69,13 @@ def get_music(request, *args, **kwargs):
     if request.method != "GET":
         return JsonResponse(ServiceResult.as_failure(error_message="Only GET method allowed", status=405).to_dict())
     try:
-        artist_id = request.GET.get("artist_id") 
+        artist_id = request.GET.get("id") 
+        print(artist_id)
         with connection.cursor() as cursor:
             if artist_id:
                 cursor.execute(
                     '''
-                    SELECT Music.id, Music.title, Music.album_name, Music.genre, Artist.artist_name
+                    SELECT Music.id, Music.title, Music.album_name, Music.genre, Artist.name
                     FROM Music
                     INNER JOIN Artist ON Music.artist_id = Artist.id
                     WHERE Music.artist_id = %s
@@ -164,13 +165,13 @@ def update_music(request, *args, **kwargs):
     try:
         data = json.loads(request.body.decode("utf-8"))
         music_id = data.get("id")
-        artist_id = data.get("artist_id")
         title = data.get("title")
         album_name = data.get("album_name")
         genre = data.get("genre")
 
-        required_fields = ["artist_id", "title", "album_name", "genre"]
+        required_fields = [ "title", "album_name", "genre"]
         missing_fields = [field for field in required_fields if data.get(field) in [None, ""]]
+
 
         if missing_fields:
             return JsonResponse(ServiceResult.as_failure(error_message="Required fields missing", status=400).to_dict())
@@ -179,16 +180,23 @@ def update_music(request, *args, **kwargs):
             cursor.execute(
                 '''
                 UPDATE Music 
-                SET artist_id = %s, title = %s, album_name = %s, genre = %s, updated_at = CURRENT_TIMESTAMP
+                SET  title = %s, album_name = %s, genre = %s, updated_at = CURRENT_TIMESTAMP
                 WHERE id = %s
                 ''',
-                [artist_id, title, album_name, genre, music_id]
+                [ title, album_name, genre, music_id]
             )
 
             if cursor.rowcount == 0:
                 return JsonResponse(ServiceResult.as_failure("Music ID not found", status=404).to_dict(), status=404)
-
-        return JsonResponse(ServiceResult.as_success("Music updated successfully").to_dict(), status=200)
+            
+            music_data = {
+            "id": music_id,
+            "title": title,
+            "album_name": album_name,
+            "genre": genre    
+        }
+            
+        return JsonResponse(ServiceResult.as_success(music_data).to_dict())
 
     except IntegrityError as e:
         error_message = str(e)

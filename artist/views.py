@@ -122,7 +122,7 @@ def get_artist(request, *args, **kwargs):
                     "id": artist[0],
                     "name": artist[1],
                     "dob": artist[2],
-                    "gender": gender_map.get(artist[3], "unknown"),
+                    "gender": gender_map.get(artist[3], ),
                     "address": artist[4],
                     "first_release_year": artist[5],
                     "no_of_albums_released": artist[6],
@@ -184,13 +184,14 @@ def update_artist(request, *args, **kwargs):
     try:
         data = json.loads(request.body.decode("utf-8"))
         artist_id = data.get("id")
+        gender_map = {"male": "m", "female": "f", "others": "o"}
 
         if not artist_id:
             return JsonResponse(ServiceResult.as_failure("Artist ID is required", status=400).to_dict(), status=400)
 
         name = data.get("name")
         dob = data.get("dob")
-        gender = data.get("gender")
+        original_gender=gender = data.get("gender")
         address = data.get("address")
         first_release_year = data.get("first_release_year")
         no_of_albums_released = data.get("no_of_albums_released")
@@ -219,12 +220,12 @@ def update_artist(request, *args, **kwargs):
 
                 if cursor.rowcount == 0:
                     return JsonResponse(ServiceResult.as_failure("Artist not found", status=404).to_dict(), status=404)
-
+ 
         artist_data = {
             "id": artist_id,
             "name": name,
             "dob": dob,
-            "gender": gender,
+            "gender": original_gender,
             "address": address,
             "first_release_year": first_release_year,
             "no_of_albums_released": no_of_albums_released,
