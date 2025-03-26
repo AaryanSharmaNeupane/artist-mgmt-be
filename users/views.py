@@ -29,7 +29,7 @@ def add_users(request, *args, **kwargs):
         address = data.get("address")
         
         required_fields = ["fname", "lname", "phone", "gender"]
-        missing_fields = [field for field in required_fields if not data.get(field)]
+        missing_fields = [field for field in required_fields if data.get(field) in [None, ""]]
         if missing_fields:
             return JsonResponse(ServiceResult.as_failure(error_message="Required fields missing", status=400).to_dict())
 
@@ -87,11 +87,12 @@ def get_users(request, *args, **kwargs):
 
     try:
         gender_map = {"m": "male", "f": "female", "o": "others"}
+        user_id = request.GET.get("id")
 
         with transaction.atomic():
+            
             with connection.cursor() as cursor:
-                if "id" in kwargs:
-                    user_id = kwargs.get("id")
+                if user_id:
                     cursor.execute(
                         '''
                         SELECT first_name, last_name, email, phone, gender, dob, address,id
@@ -159,7 +160,7 @@ def delete_users(request, *args, **kwargs):
         return JsonResponse(ServiceResult.as_failure("Only DELETE method allowed", status=405).to_dict(), status=405)
 
     try:
-        user_id = kwargs.get("id") 
+        user_id = request.GET.get("id")
         if not user_id:
             return JsonResponse(ServiceResult.as_failure("User ID is required", status=400).to_dict())
 
@@ -205,7 +206,7 @@ def update_users(request, *args, **kwargs):
         address = data.get("address")
 
         required_fields = ["fname", "lname", "phone", "gender"]
-        missing_fields = [field for field in required_fields if not data.get(field)]
+        missing_fields = [field for field in required_fields if data.get(field) in [None, ""]]
         if missing_fields:
             return JsonResponse(ServiceResult.as_failure("Required fields missing", status=400).to_dict())
         

@@ -2,7 +2,6 @@ from django.db import connection, transaction
 from django.http import JsonResponse  
 from django.db.utils import IntegrityError
 import json
-import hashlib
 from django.views.decorators.csrf import csrf_exempt
 
 from utils.service_result import ServiceResult
@@ -24,9 +23,11 @@ def add_artist(request, *args, **kwargs):
         first_release_year = data.get("first_release_year")
         no_of_albums_released = data.get("no_of_albums_released")
 
+        print(no_of_albums_released )
         
         required_fields = ["name", "first_release_year", "no_of_albums_released", "gender"]
-        missing_fields = [field for field in required_fields if not data.get(field)]
+        missing_fields = [field for field in required_fields if data.get(field) in [None, ""]]
+        print(missing_fields)
         if missing_fields:
             return JsonResponse(ServiceResult.as_failure(error_message="Required fields missing", status=400).to_dict())
 
@@ -73,82 +74,78 @@ def add_artist(request, *args, **kwargs):
 @csrf_exempt
 def get_artist(request, *args, **kwargs):
     if request.method != "GET":
-        result = ServiceResult.as_failure(error_message="Only GET method allowed", status=405)
-        return JsonResponse(result.to_dict())
+        return JsonResponse(ServiceResult.as_failure("Only GET method allowed", status=405).to_dict(), status=405)
 
     try:
         gender_map = {"m": "male", "f": "female", "o": "others"}
+        artist_id = request.GET.get("id") 
 
-        with transaction.atomic():
-            with connection.cursor() as cursor:
-                if "id" in kwargs:
-                    artist_id = kwargs.get("id")
-                    cursor.execute(
-                        '''
-                        SELECT id, name, dob, gender, address,first_release_year, no_of_albums_released
-                        FROM Artist WHERE id = %s
-                        ''', 
-                        [artist_id]
-                    )
-                    artist = cursor.fetchone()
-
-                    if not artist:
-                        return JsonResponse(ServiceResult.as_failure("Artist not found", status=404).to_dict())
-
-                    artist_data = {
-                        "id": artist[0],
-                        "name": artist[1],
-                        "dob": artist[2],
-                        "gender": gender_map.get(artist[3]),
-                        "address": artist[4],
-                        "first_release_year": artist[5],
-                        "no_of_albums_released": artist[6],
-                    }
-
-                    return JsonResponse(ServiceResult.as_success(artist_data).to_dict())
-
+        with connection.cursor() as cursor:
+            if artist_id:
                 cursor.execute(
                     '''
-                    SELECT id, name, dob, gender, address,first_release_year, no_of_albums_released
-                    FROM Artist ORDER BY ID DESC
-                    '''
+                    SELECT id, name, dob, gender, address, first_release_year, no_of_albums_released
+                    FROM Artist WHERE id = %s
+                    ''', 
+                    [artist_id]
                 )
-                artists = cursor.fetchall()
+                artist = cursor.fetchone()
 
-                if not artists:
-                    return JsonResponse(ServiceResult.as_failure("No artist found", status=404).to_dict())
+                if not artist:
+                    return JsonResponse(ServiceResult.as_failure("Artist not found", status=404).to_dict(), status=404)
 
-                artists_data = [
-                    {
-                        "id": artist[0],
-                        "name": artist[1],
-                        "dob": artist[2],
-                        "gender": gender_map.get(artist[3]),
-                        "address": artist[4],
-                        "first_release_year": artist[5],
-                        "no_of_albums_released": artist[6],
-                    }
-                    for artist in artists
-                ]
+                artist_data = {
+                    "id": artist[0],
+                    "name": artist[1],
+                    "dob": artist[2],
+                    "gender": gender_map.get(artist[3]),  
+                    "address": artist[4],
+                    "first_release_year": artist[5],
+                    "no_of_albums_released": artist[6],
+                }
 
-                return JsonResponse(ServiceResult.as_success(artists_data).to_dict())
+                return JsonResponse(ServiceResult.as_success(artist_data).to_dict(), status=200)
+
+            cursor.execute(
+                '''
+                SELECT id, name, dob, gender, address, first_release_year, no_of_albums_released
+                FROM Artist ORDER BY ID DESC
+                '''
+            )
+            artists = cursor.fetchall()
+
+            if not artists:
+                return JsonResponse(ServiceResult.as_failure("No artists found", status=404).to_dict())
+
+            artists_data = [
+                {
+                    "id": artist[0],
+                    "name": artist[1],
+                    "dob": artist[2],
+                    "gender": gender_map.get(artist[3], "unknown"),
+                    "address": artist[4],
+                    "first_release_year": artist[5],
+                    "no_of_albums_released": artist[6],
+                }
+                for artist in artists
+            ]
+
+            return JsonResponse(ServiceResult.as_success(artists_data).to_dict(), status=200)
 
     except IntegrityError as e:
-        error_message = str(e)
-        result = ServiceResult.as_failure("Database error: " + error_message, status=400)
-        return JsonResponse(result.to_dict())
+        return JsonResponse(ServiceResult.as_failure("Database error: " + str(e), status=400).to_dict(), status=400)
 
     except Exception as e:
-        return JsonResponse(ServiceResult.as_failure(str(e),status=500).to_dict())
+        return JsonResponse(ServiceResult.as_failure(str(e), status=500).to_dict(), status=500)
+
 
 
 @csrf_exempt
 def delete_artist(request, *args, **kwargs):
     if request.method != "DELETE":
         return JsonResponse(ServiceResult.as_failure("Only DELETE method allowed", status=405).to_dict(), status=405)
-
     try:
-        artist_id = kwargs.get("id")
+        artist_id = request.GET.get("id")
         if not artist_id:
             return JsonResponse(ServiceResult.as_failure("Artist ID is required", status=400).to_dict(), status=400)
 
@@ -173,6 +170,7 @@ def delete_artist(request, *args, **kwargs):
                 "This artist is referenced in another table. Please remove related entries before proceeding.",
                 status=400
             ).to_dict(), status=400)
+
         return JsonResponse(ServiceResult.as_failure("Database error: " + error_message, status=400).to_dict(), status=400)
 
     except Exception as e:
@@ -181,14 +179,14 @@ def delete_artist(request, *args, **kwargs):
 @csrf_exempt
 def update_artist(request, *args, **kwargs):
     if request.method != "PUT":
-        return JsonResponse(ServiceResult.as_failure("Only PUT method allowed", status=405).to_dict())
+        return JsonResponse(ServiceResult.as_failure("Only PUT method allowed", status=405).to_dict(), status=405)
 
     try:
         data = json.loads(request.body.decode("utf-8"))
         artist_id = data.get("id")
 
         if not artist_id:
-            return JsonResponse(ServiceResult.as_failure("Artist ID is required", status=400).to_dict())
+            return JsonResponse(ServiceResult.as_failure("Artist ID is required", status=400).to_dict(), status=400)
 
         name = data.get("name")
         dob = data.get("dob")
@@ -198,9 +196,11 @@ def update_artist(request, *args, **kwargs):
         no_of_albums_released = data.get("no_of_albums_released")
 
         required_fields = ["name", "first_release_year", "no_of_albums_released", "gender"]
-        missing_fields = [field for field in required_fields if not data.get(field)]
+        missing_fields = [field for field in required_fields if data.get(field) in [None, ""]]
         if missing_fields:
-            return JsonResponse(ServiceResult.as_failure("Required fields missing", status=400).to_dict())
+            return JsonResponse(ServiceResult.as_failure(
+                f"Required fields missing", status=400
+            ).to_dict(), status=400)
 
         gender_map = {"male": "m", "female": "f", "others": "o"}
         gender = gender_map.get(gender.lower())
@@ -218,7 +218,7 @@ def update_artist(request, *args, **kwargs):
                 )
 
                 if cursor.rowcount == 0:
-                    return JsonResponse(ServiceResult.as_failure("Artist ID not found", status=404).to_dict())
+                    return JsonResponse(ServiceResult.as_failure("Artist not found", status=404).to_dict(), status=404)
 
         artist_data = {
             "id": artist_id,
@@ -230,11 +230,11 @@ def update_artist(request, *args, **kwargs):
             "no_of_albums_released": no_of_albums_released,
         }
 
-        return JsonResponse(ServiceResult.as_success(artist_data).to_dict())
+        return JsonResponse(ServiceResult.as_success(artist_data).to_dict(), status=200)
 
     except IntegrityError as e:
         error_message = str(e)
-        return JsonResponse(ServiceResult.as_failure("Database error: " + error_message, status=400).to_dict())
+        return JsonResponse(ServiceResult.as_failure("Database error: " + error_message, status=400).to_dict(), status=400)
 
     except Exception as e:
-        return JsonResponse(ServiceResult.as_failure(str(e), status=500).to_dict())
+        return JsonResponse(ServiceResult.as_failure(str(e), status=500).to_dict(), status=500)
