@@ -38,6 +38,7 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'corsheaders',
+    'registration',
     'users',
     'artist',
     'music'
@@ -55,7 +56,12 @@ MIDDLEWARE = [
 ]
 
 ROOT_URLCONF = 'artist_mgmt_be.urls'
-CORS_ORIGIN_ALLOW_ALL = True
+CORS_ALLOW_CREDENTIALS = True  
+CORS_ORIGIN_ALLOW_ALL =True
+CORS_ALLOWED_ORIGINS = ["http://localhost:5090"]  
+CSRF_TRUSTED_ORIGINS = ["http://localhost:5090"]  
+
+
 
 TEMPLATES = [
     {

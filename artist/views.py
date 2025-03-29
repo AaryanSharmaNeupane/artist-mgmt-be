@@ -5,6 +5,8 @@ import json
 from django.views.decorators.csrf import csrf_exempt
 
 from utils.service_result import ServiceResult
+import pandas as pd
+
 
 
 
@@ -23,7 +25,6 @@ def add_artist(request, *args, **kwargs):
         first_release_year = data.get("first_release_year")
         no_of_albums_released = data.get("no_of_albums_released")
 
-        print(no_of_albums_released )
         
         required_fields = ["name", "first_release_year", "no_of_albums_released", "gender"]
         missing_fields = [field for field in required_fields if data.get(field) in [None, ""]]
@@ -239,3 +240,5 @@ def update_artist(request, *args, **kwargs):
 
     except Exception as e:
         return JsonResponse(ServiceResult.as_failure(str(e), status=500).to_dict(), status=500)
+
+
